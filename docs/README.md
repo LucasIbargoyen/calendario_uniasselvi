@@ -37,7 +37,6 @@ Permitir que alunos se organizem, marquem eventos e continuem informados sobre d
 - **Zoom e responsividade:** conteúdo deve permanecer legível e funcional em ampliação e telas menores
 
 **Definition of Done (DoD)**
-- Administradores podem fazer marcações e anotações no calendário indicando eventos/datas importantes.
 - O aluno poderá consultar os detalhes do evento ao clicar sobre a data marcada.
 
 
