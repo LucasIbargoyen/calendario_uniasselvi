@@ -13,15 +13,15 @@
     <groupId>calendario_spring</groupId>
     <artifactId>demo</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>demo</name>
+    <name>demo</name><!-- era <n> — corrigido -->
 
     <properties>
         <java.version>21</java.version>
-		<start-class>com.calendario.CalendarioApplication</start-class>
+        <start-class>com.calendario.CalendarioApplication</start-class>
     </properties>
 
     <dependencies>
-        <!-- Spring Boot Starter principal -->
+        <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
@@ -31,6 +31,7 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+    
         <!-- JPA + Hibernate -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -44,13 +45,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- H2 Console (necessário no Spring Boot 4) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-h2console</artifactId>
-        </dependency>
-
-        <!-- DevTools (útil em desenvolvimento) -->
+        <!-- DevTools -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
@@ -79,7 +74,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <!-- Classe principal correta -->
                     <mainClass>com.calendario.CalendarioApplication</mainClass>
                     <excludes>
                         <exclude>
@@ -90,7 +84,6 @@
                 </configuration>
             </plugin>
 
-            <!-- Plugin do compilador com suporte ao Lombok -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -98,9 +91,7 @@
                     <execution>
                         <id>default-compile</id>
                         <phase>compile</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
+                        <goals><goal>compile</goal></goals>
                         <configuration>
                             <annotationProcessorPaths>
                                 <path>
@@ -113,9 +104,7 @@
                     <execution>
                         <id>default-testCompile</id>
                         <phase>test-compile</phase>
-                        <goals>
-                            <goal>testCompile</goal>
-                        </goals>
+                        <goals><goal>testCompile</goal></goals>
                         <configuration>
                             <annotationProcessorPaths>
                                 <path>

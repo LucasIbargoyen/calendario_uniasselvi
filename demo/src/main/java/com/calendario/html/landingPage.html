@@ -765,11 +765,13 @@ function loadState() {
 // ─── Sidebar: Semestre ────────────────────────────────────────
 function fillForm() {
   if (!state.semestre) return;
-  document.getElementById('inp-turma').value  = state.semestre.turma  || '';
-  document.getElementById('inp-curso').value  = state.semestre.curso  || '';
-  document.getElementById('inp-semestre').value = state.semestre.semestre || '';
-  document.getElementById('inp-inicio').value = state.semestre.inicio || '';
-  document.getElementById('inp-fim').value    = state.semestre.fim    || '';
+  const s = state.semestre;
+  document.getElementById('inp-turma').value    = s.turma    || '';
+  document.getElementById('inp-curso').value    = s.curso    || '';
+  document.getElementById('inp-semestre').value = s.semestre || '';
+  // aceita tanto dataInicio (API) quanto inicio (offline)
+  document.getElementById('inp-inicio').value   = s.dataInicio || s.inicio || '';
+  document.getElementById('inp-fim').value      = s.dataFim    || s.fim    || '';
 }
 
 async function salvarSemestre() {
@@ -803,9 +805,12 @@ async function salvarSemestre() {
 
 function updateProgress() {
   const s = state.semestre;
-  if (!s || !s.inicio || !s.fim) return;
-  const ini = new Date(s.inicio + 'T00:00:00');
-  const fim = new Date(s.fim + 'T00:00:00');
+  // aceita tanto dataInicio (API) quanto inicio (offline)
+  const inicioStr = s?.dataInicio || s?.inicio;
+  const fimStr    = s?.dataFim    || s?.fim;
+  if (!s || !inicioStr || !fimStr) return;
+  const ini = new Date(inicioStr + 'T00:00:00');
+  const fim = new Date(fimStr    + 'T00:00:00');
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const total = (fim - ini) / 86400000;
   const passou = Math.max(0, Math.min(total, (hoje - ini) / 86400000));
@@ -912,7 +917,7 @@ async function carregarDadosDaAPI() {
     ]);
     state.semestre    = await semRes.json();
     state.disciplinas = await discRes.json();
-    state.eventos     = await evRes.json();
+    state.eventos     = (await evRes.json()).map(normalizarEvento);
 
     // Normaliza diasSemana: "1,3,5" → [1,3,5]
     state.disciplinas.forEach(d => {
@@ -961,8 +966,8 @@ function renderCalendar() {
     const aulas = state.disciplinas.filter(disc => disc.dias.includes(dow));
     // Eventos personalizados neste dia
     const evs = state.eventos.filter(e => {
-      const ini = new Date(e.dataIni + 'T00:00:00');
-      const fim = e.dataFim ? new Date(e.dataFim + 'T00:00:00') : ini;
+      const ini = new Date((e.dataInicio || e.dataIni) + 'T00:00:00');
+      const fim = new Date((e.dataFim || e.dataInicio || e.dataIni) + 'T00:00:00');
       return date >= ini && date <= fim;
     });
 
@@ -1035,10 +1040,21 @@ function openDayModal(dateStr, dayNum, aulas, evs) {
     </div>`;
   });
   evs.forEach(e => {
-    html += `<div class="modal-event-item" style="background:${e.cor}18;border-color:${e.cor}">
-      <div class="ev-title" style="color:${e.cor}">📌 ${e.nome}</div>
-      <div class="ev-desc">${e.desc || '—'}</div>
-      <div class="ev-time">${e.horaIni ? `⏰ ${e.horaIni}` : ''}${e.horaFim ? ` – ${e.horaFim}` : ''}</div>
+    // normaliza campos: API usa 'descricao/horarioInicio/horarioFim', offline usa 'desc/horaIni/horaFim'
+    const desc     = e.descricao    || e.desc    || '—';
+    const horaIni  = e.horarioInicio|| e.horaIni || '';
+    const horaFim  = e.horarioFim   || e.horaFim || '';
+    html += `<div class="modal-event-item" style="background:${e.cor}18;border-color:${e.cor};position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div class="ev-title" style="color:${e.cor}">📌 ${e.nome}</div>
+        <button onclick="deletarEvento(${e.id})" title="Excluir evento"
+          style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:1rem;
+                 padding:0 2px;line-height:1;flex-shrink:0;transition:color .2s;"
+          onmouseover="this.style.color='#EF4444'"
+          onmouseout="this.style.color='#9CA3AF'">✕</button>
+      </div>
+      <div class="ev-desc">${desc}</div>
+      <div class="ev-time">${horaIni ? `⏰ ${horaIni}` : ''}${horaFim ? ` – ${horaFim}` : ''}</div>
     </div>`;
   });
   if (!html) {
@@ -1060,6 +1076,29 @@ function openDayModal(dateStr, dayNum, aulas, evs) {
 
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function closeModalOutside(e) { if(e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+async function deletarEvento(id) {
+  try {
+    await fetch(`${API}/evento/${id}`, { method: 'DELETE' });
+  } catch (e) {
+    // offline: remove só do estado local
+  }
+  state.eventos = state.eventos.filter(e => e.id !== id);
+  saveState();
+  renderCalendar();
+  const dateStr = state.selectedDate;
+  const date    = new Date(dateStr + 'T00:00:00');
+  const dow     = date.getDay();
+  const dayNum  = date.getDate();
+  const aulas   = state.disciplinas.filter(d => d.dias.includes(dow));
+  const evs     = state.eventos.filter(e => {
+    const ini = new Date((e.dataInicio || e.dataIni) + 'T00:00:00');
+    const fim = new Date((e.dataFim    || e.dataIni  || e.dataInicio) + 'T00:00:00');
+    return date >= ini && date <= fim;
+  });
+  openDayModal(dateStr, dayNum, aulas, evs);
+  showToast('🗑️ Evento excluído.');
+}
 
 function toggleNewEventForm() {
   const sec = document.getElementById('new-event-section');
@@ -1091,7 +1130,8 @@ async function salvarEvento() {
       body: JSON.stringify(body)
     });
     const evento = await res.json();
-    state.eventos.push(evento);
+    // A API pode retornar LocalDate como array [ano,mes,dia] — normaliza para string
+    state.eventos.push(normalizarEvento(evento));
     renderCalendar();
     closeModal();
     showToast('✅ Evento criado!');
@@ -1102,6 +1142,27 @@ async function salvarEvento() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
+
+// Jackson serializa LocalDate como [ano,mes,dia] por padrão.
+// Esta função converte para "YYYY-MM-DD" e LocalTime para "HH:MM".
+function normalizarEvento(e) {
+  const toStr = (v) => {
+    if (!v) return '';
+    if (Array.isArray(v)) {
+      // [2026,6,4] → "2026-06-04"  |  [19,0] → "19:00"
+      if (v.length === 3) return `${v[0]}-${String(v[1]).padStart(2,'0')}-${String(v[2]).padStart(2,'0')}`;
+      if (v.length === 2) return `${String(v[0]).padStart(2,'0')}:${String(v[1]).padStart(2,'0')}`;
+    }
+    return String(v);
+  };
+  return {
+    ...e,
+    dataInicio:    toStr(e.dataInicio),
+    dataFim:       toStr(e.dataFim),
+    horarioInicio: toStr(e.horarioInicio),
+    horarioFim:    toStr(e.horarioFim),
+  };
+}
 function renderColorPick(containerId, onSelect, defaultColor) {
   const wrap = document.getElementById(containerId);
   wrap.innerHTML = '';
@@ -1145,6 +1206,15 @@ function showToast(msg) {
 }
 
 // ─── Start ────────────────────────────────────────────────────
+async function init() {
+  renderDiasCheck();
+  renderColorPick('disc-color-pick', (c) => state.selectedDiscColor = c, state.selectedDiscColor);
+  renderColorPick('ev-color-pick',   (c) => state.selectedEvColor   = c, state.selectedEvColor);
+  await carregarDadosDaAPI();
+  renderCalendar();
+  updateProgress();
+}
+
 init();
 </script>
 </body>

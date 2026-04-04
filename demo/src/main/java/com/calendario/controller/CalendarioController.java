@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/calendario")
-@CrossOrigin(origins = "*") // permite o HTML chamar a API
+//@CrossOrigin(origins = "*") // permite o HTML chamar a API
 public class CalendarioController {
 
     private final CalendarioService service;
