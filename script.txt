@@ -1,0 +1,132 @@
+// ── Configuração base da API ──────────────────────────────
+const API = 'http://localhost:8080/api';
+
+// ── Substitui salvarSemestre() ────────────────────────────
+async function salvarSemestre() {
+  const body = {
+    turma:    document.getElementById('inp-turma').value,
+    curso:    document.getElementById('inp-curso').value,
+    semestre: document.getElementById('inp-semestre').value,
+    dataInicio: document.getElementById('inp-inicio').value,
+    dataFim:    document.getElementById('inp-fim').value,
+  };
+
+  try {
+    const res = await fetch(`${API}/semestre`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const semestre = await res.json();
+    // Salva apenas o ID localmente — tudo mais vem da API
+    localStorage.setItem('semestreId', semestre.id);
+    state.semestre = semestre;
+    renderCalendar();
+    updateProgress();
+    showToast('✅ Semestre salvo!');
+  } catch (e) {
+    // API fora do ar? Cai para localStorage (modo offline)
+    salvarSemestreOffline(body);
+  }
+}
+
+// ── Substitui adicionarDisciplina() ──────────────────────
+async function adicionarDisciplina() {
+  const nome = document.getElementById('disc-nome').value.trim();
+  const dias = [...document.querySelectorAll('#dias-check button[data-sel="1"]')]
+    .map(b => parseInt(b.dataset.dia));
+  const semestreId = localStorage.getItem('semestreId');
+
+  if (!nome)         return showToast('⚠️ Informe o nome da disciplina.');
+  if (!dias.length)  return showToast('⚠️ Selecione ao menos um dia.');
+  if (!semestreId)   return showToast('⚠️ Salve o semestre antes.');
+
+  const body = {
+    nome,
+    diasSemana: dias.join(','),
+    cor: state.selectedDiscColor,
+    semestreId: parseInt(semestreId)
+  };
+
+  try {
+    const res = await fetch(`${API}/disciplina`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const disciplina = await res.json();
+    state.disciplinas.push(disciplina);
+    renderDisciplinas();
+    renderCalendar();
+    showToast('✅ Disciplina adicionada!');
+  } catch (e) {
+    showToast('⚠️ Sem conexão — salvo localmente.');
+    adicionarDisciplinaOffline(body);
+  }
+}
+
+// ── Substitui salvarEvento() ──────────────────────────────
+async function salvarEvento() {
+  const nome = document.getElementById('ev-nome').value.trim();
+  if (!nome) return showToast('⚠️ Informe o nome do evento.');
+
+  const semestreId = localStorage.getItem('semestreId');
+  const body = {
+    nome,
+    descricao:      document.getElementById('ev-desc').value,
+    dataInicio:     document.getElementById('ev-data-ini').value,
+    dataFim:        document.getElementById('ev-data-fim').value,
+    horarioInicio:  document.getElementById('ev-hora-ini').value,
+    horarioFim:     document.getElementById('ev-hora-fim').value,
+    cor:            state.selectedEvColor,
+    semestreId:     parseInt(semestreId)
+  };
+
+  try {
+    const res = await fetch(`${API}/evento`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const evento = await res.json();
+    state.eventos.push(evento);
+    renderCalendar();
+    closeModal();
+    showToast('✅ Evento criado!');
+  } catch (e) {
+    showToast('⚠️ Sem conexão — salvo localmente.');
+    salvarEventoOffline(body);
+  }
+}
+
+// ── Carrega dados ao abrir o app ──────────────────────────
+async function carregarDadosDaAPI() {
+  const semestreId = localStorage.getItem('semestreId');
+  if (!semestreId) return; // primeira vez, sem dados ainda
+
+  try {
+    const [semRes, discRes, evRes] = await Promise.all([
+      fetch(`${API}/semestre/${semestreId}`),
+      fetch(`${API}/disciplina?semestreId=${semestreId}`),
+      fetch(`${API}/evento?semestreId=${semestreId}`)
+    ]);
+    state.semestre    = await semRes.json();
+    state.disciplinas = await discRes.json();
+    state.eventos     = await evRes.json();
+
+    // Normaliza diasSemana: "1,3,5" → [1,3,5]
+    state.disciplinas.forEach(d => {
+      if (typeof d.diasSemana === 'string') {
+        d.dias = d.diasSemana.split(',').map(Number);
+      }
+    });
+
+    fillForm();
+    renderDisciplinas();
+    renderCalendar();
+    updateProgress();
+  } catch (e) {
+    // API offline — usa o que já está no localStorage
+    loadState();
+  }
+}

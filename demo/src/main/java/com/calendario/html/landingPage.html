@@ -721,6 +721,7 @@
 const COLORS = ['#F47920','#003B71','#EF4444','#3B82F6','#10B981','#8B5CF6','#F59E0B','#EC4899','#14B8A6','#6366F1'];
 const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const API = 'http://localhost:8080/api';
 
 let state = {
   currentYear: new Date().getFullYear(),
@@ -771,19 +772,34 @@ function fillForm() {
   document.getElementById('inp-fim').value    = state.semestre.fim    || '';
 }
 
-function salvarSemestre() {
-  state.semestre = {
+async function salvarSemestre() {
+  const body = {
     turma:    document.getElementById('inp-turma').value,
     curso:    document.getElementById('inp-curso').value,
     semestre: document.getElementById('inp-semestre').value,
-    inicio:   document.getElementById('inp-inicio').value,
-    fim:      document.getElementById('inp-fim').value,
+    dataInicio: document.getElementById('inp-inicio').value,
+    dataFim:    document.getElementById('inp-fim').value,
   };
-  saveState();
-  renderCalendar();
-  updateProgress();
-  showToast('✅ Semestre salvo com sucesso!');
+
+  try {
+    const res = await fetch(`${API}/semestre`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const semestre = await res.json();
+    // Salva apenas o ID localmente — tudo mais vem da API
+    localStorage.setItem('semestreId', semestre.id);
+    state.semestre = semestre;
+    renderCalendar();
+    updateProgress();
+    showToast('✅ Semestre salvo!');
+  } catch (e) {
+    // API fora do ar? Cai para localStorage (modo offline)
+    salvarSemestreOffline(body);
+  }
 }
+
 
 function updateProgress() {
   const s = state.semestre;
@@ -824,25 +840,40 @@ function renderDiasCheck() {
   });
 }
 
-function adicionarDisciplina() {
+async function adicionarDisciplina() {
   const nome = document.getElementById('disc-nome').value.trim();
-  if (!nome) return showToast('⚠️ Informe o nome da disciplina.');
   const dias = [...document.querySelectorAll('#dias-check button[data-sel="1"]')]
     .map(b => parseInt(b.dataset.dia));
-  if (!dias.length) return showToast('⚠️ Selecione ao menos um dia da semana.');
-  state.disciplinas.push({ nome, dias, cor: state.selectedDiscColor });
-  document.getElementById('disc-nome').value = '';
-  document.querySelectorAll('#dias-check button').forEach(b => {
-    b.dataset.sel = '0';
-    b.style.background = 'var(--gray-100)';
-    b.style.color = 'var(--gray-700)';
-    b.style.borderColor = 'var(--gray-200)';
-  });
-  saveState();
-  renderDisciplinas();
-  renderCalendar();
-  showToast('✅ Disciplina adicionada!');
+  const semestreId = localStorage.getItem('semestreId');
+
+  if (!nome)         return showToast('⚠️ Informe o nome da disciplina.');
+  if (!dias.length)  return showToast('⚠️ Selecione ao menos um dia.');
+  if (!semestreId)   return showToast('⚠️ Salve o semestre antes.');
+
+  const body = {
+    nome,
+    diasSemana: dias.join(','),
+    cor: state.selectedDiscColor,
+    semestreId: parseInt(semestreId)
+  };
+
+  try {
+    const res = await fetch(`${API}/disciplina`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const disciplina = await res.json();
+    state.disciplinas.push(disciplina);
+    renderDisciplinas();
+    renderCalendar();
+    showToast('✅ Disciplina adicionada!');
+  } catch (e) {
+    showToast('⚠️ Sem conexão — salvo localmente.');
+    adicionarDisciplinaOffline(body);
+  }
 }
+
 
 function renderDisciplinas() {
   const list = document.getElementById('disciplinas-list');
@@ -866,6 +897,38 @@ function removerDisciplina(i) {
   saveState();
   renderDisciplinas();
   renderCalendar();
+}
+
+// ── Carrega dados ao abrir o app ──────────────────────────
+async function carregarDadosDaAPI() {
+  const semestreId = localStorage.getItem('semestreId');
+  if (!semestreId) return; // primeira vez, sem dados ainda
+
+  try {
+    const [semRes, discRes, evRes] = await Promise.all([
+      fetch(`${API}/semestre/${semestreId}`),
+      fetch(`${API}/disciplina?semestreId=${semestreId}`),
+      fetch(`${API}/evento?semestreId=${semestreId}`)
+    ]);
+    state.semestre    = await semRes.json();
+    state.disciplinas = await discRes.json();
+    state.eventos     = await evRes.json();
+
+    // Normaliza diasSemana: "1,3,5" → [1,3,5]
+    state.disciplinas.forEach(d => {
+      if (typeof d.diasSemana === 'string') {
+        d.dias = d.diasSemana.split(',').map(Number);
+      }
+    });
+
+    fillForm();
+    renderDisciplinas();
+    renderCalendar();
+    updateProgress();
+  } catch (e) {
+    // API offline — usa o que já está no localStorage
+    loadState();
+  }
 }
 
 // ─── Calendar ─────────────────────────────────────────────────
@@ -1005,23 +1068,37 @@ function toggleNewEventForm() {
   document.getElementById('btn-toggle-new').textContent = isOpen ? '✕ Cancelar' : '＋ Novo Evento';
 }
 
-function salvarEvento() {
+async function salvarEvento() {
   const nome = document.getElementById('ev-nome').value.trim();
   if (!nome) return showToast('⚠️ Informe o nome do evento.');
-  state.eventos.push({
-    id: Date.now(),
+
+  const semestreId = localStorage.getItem('semestreId');
+  const body = {
     nome,
-    desc:     document.getElementById('ev-desc').value,
-    dataIni:  document.getElementById('ev-data-ini').value,
-    dataFim:  document.getElementById('ev-data-fim').value || document.getElementById('ev-data-ini').value,
-    horaIni:  document.getElementById('ev-hora-ini').value,
-    horaFim:  document.getElementById('ev-hora-fim').value,
-    cor:      state.selectedEvColor,
-  });
-  saveState();
-  renderCalendar();
-  closeModal();
-  showToast('✅ Evento criado!');
+    descricao:      document.getElementById('ev-desc').value,
+    dataInicio:     document.getElementById('ev-data-ini').value,
+    dataFim:        document.getElementById('ev-data-fim').value,
+    horarioInicio:  document.getElementById('ev-hora-ini').value,
+    horarioFim:     document.getElementById('ev-hora-fim').value,
+    cor:            state.selectedEvColor,
+    semestreId:     parseInt(semestreId)
+  };
+
+  try {
+    const res = await fetch(`${API}/evento`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const evento = await res.json();
+    state.eventos.push(evento);
+    renderCalendar();
+    closeModal();
+    showToast('✅ Evento criado!');
+  } catch (e) {
+    showToast('⚠️ Sem conexão — salvo localmente.');
+    salvarEventoOffline(body);
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
