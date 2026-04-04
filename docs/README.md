@@ -36,6 +36,7 @@ Permitir que alunos se organizem, marquem eventos e continuem informados sobre d
 - **Leitores de tela:** estrutura e elementos devem ser compatíveis com tecnologias assistivas.
 - **Zoom e responsividade:** conteúdo deve permanecer legível e funcional em ampliação e telas menores
 
+
 **Definition of Done (DoD)**
 - O aluno poderá consultar os detalhes do evento ao clicar sobre a data marcada.
 
