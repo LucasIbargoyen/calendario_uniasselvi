@@ -1151,15 +1151,18 @@ async function salvarEvento() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const evento = await res.json();
+    // Valida que o evento retornado tem dataInicio antes de adicionar
+    if (!evento || (!evento.dataInicio && !evento.dataIni)) throw new Error('Resposta inválida da API');
     // A API pode retornar LocalDate como array [ano,mes,dia] — normaliza para string
     state.eventos.push(normalizarEvento(evento));
     saveState();
     renderCalendar();
     closeModal();
-    showToast('✅ Evento criado!');
+    showToast('\u2705 Evento criado!');
   } catch (e) {
-    showToast('⚠️ Sem conexão — salvo localmente.');
+    console.warn('API indisponível ou erro:', e.message);
     salvarEventoOffline(body);
   }
 }
