@@ -734,16 +734,38 @@ let state = {
   selectedDiscColor: COLORS[0],
 };
 
-// ─── Init ─────────────────────────────────────────────────────
-function init() {
-  loadState();
-  renderDiasCheck();
-  renderColorPick('disc-color-pick', (c) => state.selectedDiscColor = c, state.selectedDiscColor);
-  renderColorPick('ev-color-pick', (c) => state.selectedEvColor = c, state.selectedEvColor);
+// ─── Offline fallbacks ────────────────────────────────────────
+function salvarSemestreOffline(body) {
+  state.semestre = { ...body, inicio: body.dataInicio, fim: body.dataFim };
+  saveState();
   renderCalendar();
-  renderDisciplinas();
   updateProgress();
-  if(state.semestre) fillForm();
+  showToast('⚠️ Sem conexão — semestre salvo localmente.');
+}
+
+function adicionarDisciplinaOffline(body) {
+  const dias = body.diasSemana ? body.diasSemana.split(',').map(Number) : [];
+  state.disciplinas.push({ ...body, dias });
+  saveState();
+  renderDisciplinas();
+  renderCalendar();
+  showToast('⚠️ Sem conexão — disciplina salva localmente.');
+}
+
+function salvarEventoOffline(body) {
+  const novoEvento = {
+    ...body,
+    id: Date.now(), // id local único
+    dataIni: body.dataInicio,
+    dataFim: body.dataFim,
+    horaIni: body.horarioInicio,
+    horaFim: body.horarioFim,
+  };
+  state.eventos.push(novoEvento);
+  saveState();
+  renderCalendar();
+  closeModal();
+  showToast('⚠️ Sem conexão — evento salvo localmente.');
 }
 
 function saveState() {
@@ -1132,6 +1154,7 @@ async function salvarEvento() {
     const evento = await res.json();
     // A API pode retornar LocalDate como array [ano,mes,dia] — normaliza para string
     state.eventos.push(normalizarEvento(evento));
+    saveState();
     renderCalendar();
     closeModal();
     showToast('✅ Evento criado!');
@@ -1207,12 +1230,15 @@ function showToast(msg) {
 
 // ─── Start ────────────────────────────────────────────────────
 async function init() {
+  loadState(); // carrega localStorage primeiro (garante dados offline)
   renderDiasCheck();
   renderColorPick('disc-color-pick', (c) => state.selectedDiscColor = c, state.selectedDiscColor);
   renderColorPick('ev-color-pick',   (c) => state.selectedEvColor   = c, state.selectedEvColor);
-  await carregarDadosDaAPI();
+  renderDisciplinas();
+  if (state.semestre) fillForm();
   renderCalendar();
   updateProgress();
+  await carregarDadosDaAPI(); // tenta sincronizar com a API (sobrescreve se online)
 }
 
 init();
