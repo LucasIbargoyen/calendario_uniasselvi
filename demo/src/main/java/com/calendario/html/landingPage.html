@@ -890,8 +890,20 @@ async function adicionarDisciplina() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    const disciplina = await res.json();
+    
+    let disciplina = await res.json();
+    
+    // --- O FIX ESTÁ AQUI ---
+    // Normaliza a disciplina antes de dar o push no estado
+    if (typeof disciplina.diasSemana === 'string') {
+      disciplina.dias = disciplina.diasSemana.split(',').map(Number);
+    } else {
+      disciplina.dias = dias; // fallback para o que já temos
+    }
+    // -----------------------
+
     state.disciplinas.push(disciplina);
+    saveState(); // Salva o estado corrigido no localStorage
     renderDisciplinas();
     renderCalendar();
     showToast('✅ Disciplina adicionada!');
@@ -985,8 +997,7 @@ function renderCalendar() {
     const dow = date.getDay();
 
     // Aulas das disciplinas
-    const aulas = state.disciplinas.filter(disc => disc.dias.includes(dow));
-    // Eventos personalizados neste dia
+    const aulas = state.disciplinas.filter(disc => disc.dias?.includes(dow));    // Eventos personalizados neste dia
     const evs = state.eventos.filter(e => {
       const ini = new Date((e.dataInicio || e.dataIni) + 'T00:00:00');
       const fim = new Date((e.dataFim || e.dataInicio || e.dataIni) + 'T00:00:00');
