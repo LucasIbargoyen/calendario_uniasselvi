@@ -2,4 +2,6 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="today_default">#FF1565C0</color>
+    <color name="header_default">#FF1A1A1A</color>
 </resources>

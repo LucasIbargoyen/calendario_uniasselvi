@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="CalendarComponent">
+        <attr name="semesterStartColor" format="color|reference" />
+        <attr name="semesterEndColor" format="color|reference" />
+        <attr name="todayHighlightColor" format="color|reference" />
+        <attr name="headerColor" format="color|reference" />
+    </declare-styleable>
+</resources>

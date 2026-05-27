@@ -1,3 +1,16 @@
 <resources>
-    <string name="app_name">UniasselviCalendarioApp</string>
+    <string name="app_name">Calendário Uniasselvi</string>
+
+    <!-- Month navigation -->
+    <string name="prev_month">Mês anterior</string>
+    <string name="next_month">Próximo mês</string>
+
+    <!-- Weekday abbreviations -->
+    <string name="sun_abbr">Dom</string>
+    <string name="mon_abbr">Seg</string>
+    <string name="tue_abbr">Ter</string>
+    <string name="wed_abbr">Qua</string>
+    <string name="thu_abbr">Qui</string>
+    <string name="fri_abbr">Sex</string>
+    <string name="sat_abbr">Sáb</string>
 </resources>
